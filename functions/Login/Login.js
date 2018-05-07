@@ -7,7 +7,7 @@ exports.getUidWithToken = (token) => {
         })
         .catch(error => {
             console.log(error);
-            throw error
+            return error
         })
 };
 

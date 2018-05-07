@@ -25,14 +25,47 @@ exports.createUserAccount = functions.auth.user().onCreate((data) => {
 });
 
 exports.getAllParkingSpots = functions.https.onRequest((req,res) => {
+
+    const data = {
+        token: req.header('authorization')
+    };
+
     cors(req,res,() => {
-        SpotsService.getAllParkingSpots()
-            .then(spots => {
-                return res.status(200).send(spots)
+        if(!data.token){
+            return res.status(403).send(ErrorService.invalidToken("No token",""))
+        }
+
+        LoginService.getUidWithToken(data.token)
+        .then(uid => {
+            return SpotsService.getAllParkingSpots()
+        })
+        .then(spots => {
+            return res.status(200).send(spots)
+        })
+        .catch(error => {
+            console.log(error);
+            return res.status(400).send(ErrorService.noParkingSpots(error))
+        })
+        .catch(error => {
+            console.log(error);
+            res.status(403).send(ErrorService.invalidToken(error,data.token))
+        })
+    })
+});
+
+exports.verifyIdToken = functions.https.onRequest((req,res) => {
+    const data = {
+        token: req.header('authorization')
+    };
+
+    cors(req,res,() => {
+        LoginService.getUidWithToken(data.token)
+            .then(uid => {
+                return res.status(200).send(uid)
             })
             .catch(error => {
                 console.log(error);
-                res.status(400).send(ErrorService.noParkingSpots(error))
+                res.status(403).send(ErrorService.invalidToken(error,data.token))
             })
     })
 });
