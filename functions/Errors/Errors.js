@@ -19,3 +19,7 @@ exports.noParkingSpots = (error) => {
 exports.invalidToken = (error,token) => {
     return formatError(error,'token',token,'Invalid token')
 };
+
+exports.invalidCoordinates = (error) => {
+    return formatError(error)
+};

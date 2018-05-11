@@ -27,7 +27,8 @@ exports.createUserAccount = functions.auth.user().onCreate((data) => {
 exports.getAllParkingSpots = functions.https.onRequest((req,res) => {
 
     const data = {
-        token: req.header('authorization')
+        token: req.header('authorization'),
+        city: req.query.city
     };
 
     cors(req,res,() => {
@@ -37,7 +38,7 @@ exports.getAllParkingSpots = functions.https.onRequest((req,res) => {
 
         LoginService.getUidWithToken(data.token)
         .then(uid => {
-            return SpotsService.getAllParkingSpots()
+            return SpotsService.getAllParkingSpots(data.city)
         })
         .then(spots => {
             return res.status(200).send(spots)
@@ -50,6 +51,25 @@ exports.getAllParkingSpots = functions.https.onRequest((req,res) => {
             console.log(error);
             res.status(403).send(ErrorService.invalidToken(error,data.token))
         })
+    })
+});
+
+exports.estimateTimeToSpot = functions.https.onRequest((req,res) => {
+    const data = {
+        token: req.header('authorization'),
+        from: req.query.from,
+        to: req.query.to,
+    };
+
+    cors(req,res, () => {
+        SpotsService.estimateTimeToSpot(data.from,data.to)
+            .then(response => {
+                return res.status(200).send(response)
+            })
+            .catch(error => {
+                console.log(error);
+                res.send(400).send(ErrorService.invalidCoordinates(error))
+            })
     })
 });
 
@@ -66,6 +86,53 @@ exports.verifyIdToken = functions.https.onRequest((req,res) => {
             .catch(error => {
                 console.log(error);
                 res.status(403).send(ErrorService.invalidToken(error,data.token))
+            })
+    })
+});
+
+exports.getNearbySpots = functions.https.onRequest((req,res) => {
+    const data = {
+        token: req.header('authorization'),
+        from: {
+            coordinates: req.query.coordinates,
+            city: req.query.city
+        },
+        maxDistance: req.query.maxDistance
+    };
+
+    cors(req,res, () => {
+        SpotsService.getNearbySpots(data.from,data.maxDistance)
+            .then(response => {
+                console.log("NEARBY",response);
+                return res.status(200).send(response)
+            })
+            .catch(error => {
+                console.log(error);
+                res.status(400).send({error: {message: 'No nearby spots in that city'}})
+            })
+    })
+});
+
+exports.getAvailableCities = functions.https.onRequest((req,res) => {
+    const data = {
+        token: req.header('authorization')
+    };
+
+    cors(req,res, () => {
+        return LoginService.getUidWithToken(data.token)
+            .then(uid => {
+                console.log(uid);
+                if(uid){
+                    return SpotsService.getAvailableCities()
+                }
+                throw new Error('Invalid Token')
+            })
+            .then(response => {
+                return res.status(200).send(response)
+            })
+            .catch(error => {
+                console.log(error);
+                throw new functions.https.HttpsError('not-found','Not found',error)
             })
     })
 });
