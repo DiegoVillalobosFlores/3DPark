@@ -6,8 +6,10 @@ exports.getUidWithToken = (token) => {
             return user.uid
         })
         .catch(error => {
-            console.log(error);
-            throw error
+        const Error = error;
+        Error.status = 403;
+        console.log(Error);
+        throw Error
         })
 };
 
@@ -17,7 +19,9 @@ exports.setUser = (uid,user) => {
             return result
         })
         .catch(error => {
-            console.log(error);
-            throw error
+            const Error = error;
+            Error.status = 400;
+            console.log(Error);
+            throw Error
         })
 };

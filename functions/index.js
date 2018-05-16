@@ -4,8 +4,10 @@ const cors = require('cors')({origin:true});
 const serviceAccount = require('./firebaseAdminSDKKey');
 
 const ErrorService = require('./Errors/Errors');
-const LoginService = require('./Login/Login');
+const LoginService = require('./User/Login');
 const SpotsService = require('./Parking/Spots');
+const ScoreService = require('./Scores/Users');
+const UsersService = require('./User/Users');
 
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
@@ -18,7 +20,9 @@ exports.createUserAccount = functions.auth.user().onCreate((data) => {
         email: data.email,
         name: data.displayName,
         disabled: false,
-        joined: new Date()
+        joined: new Date(),
+        photo: "",
+        score: "SS",
     };
 
     return LoginService.setUser(uid,user)
@@ -45,11 +49,7 @@ exports.getAllParkingSpots = functions.https.onRequest((req,res) => {
         })
         .catch(error => {
             console.log(error);
-            return res.status(400).send(ErrorService.noParkingSpots(error))
-        })
-        .catch(error => {
-            console.log(error);
-            res.status(403).send(ErrorService.invalidToken(error,data.token))
+            res.status(error.status).send(error)
         })
     })
 });
@@ -97,13 +97,12 @@ exports.getNearbySpots = functions.https.onRequest((req,res) => {
             coordinates: req.query.coordinates,
             city: req.query.city
         },
-        maxDistance: req.query.maxDistance
+        range: req.query.range
     };
 
     cors(req,res, () => {
-        SpotsService.getNearbySpots(data.from,data.maxDistance)
+        SpotsService.getNearbySpots(data.from,data.range)
             .then(response => {
-                console.log("NEARBY",response);
                 return res.status(200).send(response)
             })
             .catch(error => {
@@ -121,7 +120,6 @@ exports.getAvailableCities = functions.https.onRequest((req,res) => {
     cors(req,res, () => {
         return LoginService.getUidWithToken(data.token)
             .then(uid => {
-                console.log(uid);
                 if(uid){
                     return SpotsService.getAvailableCities()
                 }
@@ -132,7 +130,61 @@ exports.getAvailableCities = functions.https.onRequest((req,res) => {
             })
             .catch(error => {
                 console.log(error);
-                throw new functions.https.HttpsError('not-found','Not found',error)
+                res.send( new functions.https.HttpsError('not-found','Not found',error))
             })
     })
+});
+
+exports.rateUser = functions.https.onRequest((req,res) => {
+    const data = {
+        token: req.header('authorization'),
+        score: req.body.score,
+        uid: req.query.uid
+    };
+
+    cors(req,res,() => {
+        return ScoreService.rateUser(data.uid,data.score)
+            .then(response => {
+                return res.status(200).send(response)
+            })
+            .catch(error => {
+                console.log(error);
+                return res.status(error.status).send(error)
+            })
+    })
+});
+
+exports.getUserData = functions.https.onRequest((req,res) => {
+    const data = {
+        token: req.header('authorization'),
+        vehicles: req.query.vehicles,
+    };
+
+    let user = {};
+    let uid;
+
+    cors(req,res,() => {
+        return LoginService.getUidWithToken(data.token)
+        .then(uid => {
+            this.uid = uid;
+            return UsersService.getUserData(uid)
+        })
+        .then(userData => {
+            user = userData;
+            console.log("UID",uid);
+            if(data.vehicles){
+                return UsersService.getUserCars(user.uid);
+            }
+            return res.status(200).send(user)
+        })
+        .then(vehiclesData=> {
+            user.vehicles = vehiclesData;
+            return res.status(200).send(user)
+        })
+        .catch(error => {
+            console.log(error);
+            return res.status(error.status).send(error)
+        })
+
+    });
 });
