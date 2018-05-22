@@ -20,6 +20,33 @@ exports.getUserCars = (uid) =>{
         })
 };
 
+exports.getUserReservations = (uid) => {
+    const reservations = [];
+    return admin.firestore().collection(Collections.users).doc(uid).collection('reservations').get()
+        .then(reservationsSnapshot => {
+            const promises = [];
+            reservationsSnapshot.forEach(reservationRef => {
+                const reservation = reservationRef.data();
+                reservation.id = reservationRef.id;
+                reservations.push(reservation);
+                promises.push(admin.firestore().collection('spots').doc(reservation.spot).get())
+            });
+            return Promise.all(promises)
+        })
+        .then(spotsSnapshots => {
+            console.log(spotsSnapshots);
+            spotsSnapshots.forEach((spotRef,spotIndex) => {
+                reservations[spotIndex].spot = spotRef.data()
+            });
+            return reservations
+        })
+        .catch(error => {
+            const Error = error;
+            Error.status = 400;
+            throw Error
+        })
+};
+
 exports.getUserData = (uid) => {
     console.log("Collections",Collections);
     return admin.firestore().collection(Collections.users).doc(uid).get()

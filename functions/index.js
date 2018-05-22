@@ -32,7 +32,10 @@ exports.getAllParkingSpots = functions.https.onRequest((req,res) => {
 
     const data = {
         token: req.header('authorization'),
-        city: req.query.city
+        from: {
+            coordinates: req.query.coordinates,
+            city: req.query.city
+        }
     };
 
     cors(req,res,() => {
@@ -42,7 +45,7 @@ exports.getAllParkingSpots = functions.https.onRequest((req,res) => {
 
         LoginService.getUidWithToken(data.token)
         .then(uid => {
-            return SpotsService.getAllParkingSpots(data.city)
+            return SpotsService.getAllParkingSpots(data.from)
         })
         .then(spots => {
             return res.status(200).send(spots)
@@ -69,6 +72,108 @@ exports.estimateTimeToSpot = functions.https.onRequest((req,res) => {
             .catch(error => {
                 console.log(error);
                 res.send(400).send(ErrorService.invalidCoordinates(error))
+            })
+    })
+});
+
+exports.reserveSpot = functions.https.onRequest((req,res) => {
+    const data = {
+        token: req.header('authorization'),
+        hours: req.query.hours,
+        spot: req.query.spot,
+    };
+
+    cors(req,res,() => {
+        LoginService.getUidWithToken(data.token)
+            .then(uid => {
+                const date = new Date();
+                const toDate = date;
+                toDate.setHours(date.getHours() + data.hours);
+                data.reservation = {
+                    uid: uid,
+                    from: date,
+                    to: toDate,
+                };
+                data.reservation.uid = uid;
+                return SpotsService.reserveSpot(data.spot,data.reservation)
+            }).then(response => {
+                return res.status(200).send({ok: response})
+            })
+            .catch(error => {
+                console.log(error);
+                return res.status(400).send(error)
+            });
+    })
+});
+
+exports.getUserSpots = functions.https.onRequest((req,res) => {
+    const data = {
+        token: req.header('authorization'),
+        from: {
+            coordinates: req.query.coordinates,
+            city: req.query.city
+        }
+    };
+
+    cors(req,res,() => {
+        if(!data.token){
+            return res.status(403).send(ErrorService.invalidToken("No token",""))
+        }
+
+        LoginService.getUidWithToken(data.token)
+            .then(uid => {
+                return SpotsService.getAllParkingSpots(data.from,uid)
+            })
+            .then(spots => {
+                return res.status(200).send(spots)
+            })
+            .catch(error => {
+                console.log(error);
+                res.status(error.status).send(error)
+            })
+    })
+});
+
+exports.addSpot = functions.https.onRequest((req,res) => {
+    const data = {
+        token: req.header('authorization'),
+        spot: req.body.spot
+    };
+
+    cors(req,res,() => {
+        LoginService.getUidWithToken(data.token)
+            .then(uid => {
+                data.spot.owner = uid;
+                data.spot.score = "SS";
+                data.spot.photo = "https://firebasestorage.googleapis.com/v0/b/dpark-4c6f8.appspot.com/o/spots%2FGarage-View.jpg?alt=media&token=75087f51-2f93-4232-89da-23f0aecd2284";
+                data.spot.available = true;
+                return SpotsService.addSpot(data.spot)
+            })
+            .then(response => {
+                return res.status(200).send(response)
+            })
+            .catch(error => {
+                return res.status(error.status).send(error)
+            })
+    })
+});
+
+exports.getUserReservations = functions.https.onRequest((req,res) => {
+    const data = {
+        token: req.header('authorization')
+    };
+
+    cors(req,res,() => {
+        LoginService.getUidWithToken(data.token)
+            .then(uid => {
+                return UsersService.getUserReservations(uid)
+            })
+            .then(reservations => {
+                return res.status(200).send(reservations)
+            })
+            .catch(error => {
+                console.log(error);
+                return res.status(error.status).send(error)
             })
     })
 });
